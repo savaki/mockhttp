@@ -104,6 +104,7 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 	}
 
 	return &response{
+		req:     req,
 		w:       w,
 		cookies: c.cookies,
 	}

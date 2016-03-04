@@ -9,6 +9,7 @@ import (
 )
 
 type Response interface {
+	Request() *http.Request
 	Code() int
 	Reader() io.Reader
 	UnmarshalJSON(v interface{}) error
@@ -18,8 +19,13 @@ type Response interface {
 }
 
 type response struct {
+	req     *http.Request
 	w       *httptest.ResponseRecorder
 	cookies map[string]string
+}
+
+func (r *response) Request() *http.Request {
+	return r.req
 }
 
 func (r *response) Code() int {
