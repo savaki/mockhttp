@@ -3,7 +3,7 @@ Tools to simplify testing golang http http.Handler
 
 ## JSON Example
 
-```
+``` go
 type Login struct {
   Username string 
   Password string
