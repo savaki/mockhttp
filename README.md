@@ -1,5 +1,5 @@
 # mockhttp
-Tools to simplify testing golang http http.Handler
+Tools to simplify testing golang http.Handler
 
 ## JSON Example
 

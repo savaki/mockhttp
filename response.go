@@ -11,7 +11,7 @@ import (
 type Response interface {
 	Request() *http.Request
 	Code() int
-	Reader() io.Reader
+	Body() io.Reader
 	UnmarshalJSON(v interface{}) error
 	UnmarshalXML(v interface{}) error
 	Header() http.Header
@@ -32,7 +32,7 @@ func (r *response) Code() int {
 	return r.w.Code
 }
 
-func (r *response) Reader() io.Reader {
+func (r *response) Body() io.Reader {
 	return r.w.Body
 }
 
