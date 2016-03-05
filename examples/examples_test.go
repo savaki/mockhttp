@@ -1,10 +1,9 @@
 package examples_test
 
 import (
+	"io/ioutil"
 	"net/http"
 	"testing"
-
-	"io/ioutil"
 
 	"github.com/savaki/mockhttp"
 	"github.com/savaki/mockhttp/examples"
