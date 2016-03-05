@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 
+	"io/ioutil"
 	"mime/multipart"
 	"net/textproto"
 )
@@ -31,7 +32,7 @@ func New(handler http.Handler) *Client {
 	}
 }
 
-func (c *Client) DO(method, path string, header http.Header, body interface{}, keyvals ...KV) Response {
+func (c *Client) DO(method, path string, header http.Header, body interface{}, keyvals ...KV) (*http.Response, error) {
 	if c.cookies == nil {
 		c.cookies = map[string]string{}
 	}
@@ -103,34 +104,35 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 		c.cookies[name] = value
 	}
 
-	return &response{
-		req:     req,
-		w:       w,
-		cookies: c.cookies,
-	}
+	return &http.Response{
+		StatusCode: w.Code,
+		Request:    req,
+		Header:     w.HeaderMap,
+		Body:       ioutil.NopCloser(bytes.NewReader(w.Body.Bytes())),
+	}, nil
 }
 
-func (c *Client) GET(path string, keyvals ...KV) Response {
+func (c *Client) GET(path string, keyvals ...KV) (*http.Response, error) {
 	return c.DO("GET", path, nil, nil, keyvals...)
 }
 
-func (c *Client) POST(path string, body interface{}) Response {
+func (c *Client) POST(path string, body interface{}) (*http.Response, error) {
 	return c.DO("POST", path, nil, body)
 }
 
-func (c *Client) PUT(path string, body interface{}) Response {
+func (c *Client) PUT(path string, body interface{}) (*http.Response, error) {
 	return c.DO("PUT", path, nil, body)
 }
 
-func (c *Client) PATCH(path string, body interface{}) Response {
+func (c *Client) PATCH(path string, body interface{}) (*http.Response, error) {
 	return c.DO("PATCH", path, nil, body)
 }
 
-func (c *Client) DELETE(path string, keyvals ...KV) Response {
+func (c *Client) DELETE(path string, keyvals ...KV) (*http.Response, error) {
 	return c.DO("DELETE", path, nil, nil, keyvals...)
 }
 
-func (c *Client) Upload(path string, r io.Reader) Response {
+func (c *Client) Upload(path string, r io.Reader) (*http.Response, error) {
 	buf := bytes.NewBuffer([]byte{})
 
 	m := multipart.NewWriter(buf)

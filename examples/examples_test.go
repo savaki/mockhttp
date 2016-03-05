@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
+	"encoding/json"
 
 	"github.com/savaki/mockhttp"
 	"github.com/savaki/mockhttp/examples"
@@ -11,21 +12,27 @@ import (
 
 func TestNotFound(t *testing.T) {
 	app := mockhttp.New(examples.Router())
-	resp := app.GET("/invalid-path")
-	if resp.Code() != http.StatusNotFound {
+	resp, err := app.GET("/invalid-path")
+	if err != nil {
+		t.Fail()
+	}
+	if resp.StatusCode != http.StatusNotFound {
 		t.Fail()
 	}
 }
 
-func testPOST(t *testing.T) {
+func TestPOST(t *testing.T) {
 	app := mockhttp.New(examples.Router())
-	resp := app.POST("/greeting", examples.GreetingIn{Name: "Matt"})
-	if resp.Code() != http.StatusOK {
+	resp, err := app.POST("/greeting", examples.GreetingIn{Name: "Matt"})
+	if err != nil {
+		t.Fail()
+	}
+	if resp.StatusCode != http.StatusOK {
 		t.Fail()
 	}
 
 	out := examples.GreetingOut{}
-	err := resp.UnmarshalJSON(&out)
+	err = json.NewDecoder(resp.Body).Decode(&out)
 	if err != nil {
 		t.Fail()
 	}
@@ -35,15 +42,18 @@ func testPOST(t *testing.T) {
 	}
 }
 
-func testGET(t *testing.T) {
+func TestGET(t *testing.T) {
 	message := "argle-bargle"
 	app := mockhttp.New(examples.Router())
-	resp := app.GET("/echo", mockhttp.KV{"q", message})
-	if resp.Code() != http.StatusOK {
+	resp, err := app.GET("/echo", mockhttp.KV{"q", message})
+	if err != nil {
+		t.Fail()
+	}
+	if resp.StatusCode != http.StatusOK {
 		t.Fail()
 	}
 
-	data, err := ioutil.ReadAll(resp.Body())
+	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		t.Fail()
 	}
