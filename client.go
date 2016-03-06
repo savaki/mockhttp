@@ -33,7 +33,8 @@ func New(handler http.Handler) *Client {
 }
 
 func (c *Client) Cookie(name string) (string, bool) {
-	return c.cookies[name]
+	v, ok := c.cookies[name]
+	return v, ok
 }
 
 func (c *Client) DO(method, path string, header http.Header, body interface{}, keyvals ...KV) (*http.Response, error) {
