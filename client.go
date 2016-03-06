@@ -32,6 +32,10 @@ func New(handler http.Handler) *Client {
 	}
 }
 
+func (c *Client) Cookie(name string) (string, bool) {
+	return c.cookies[name]
+}
+
 func (c *Client) DO(method, path string, header http.Header, body interface{}, keyvals ...KV) (*http.Response, error) {
 	if c.cookies == nil {
 		c.cookies = map[string]string{}
