@@ -35,12 +35,15 @@ func New(handler http.Handler, configs ...func(*Client)) *Client {
 	}
 
 	client := &Client{
-		codebase: "http://localhost",
-		client:   httpClient,
+		client: httpClient,
 	}
 
 	for _, config := range configs {
 		config(client)
+	}
+
+	if client.codebase == "" {
+		client.codebase = "http://localhost"
 	}
 
 	// strip trailing slashes from codebase
