@@ -5,19 +5,18 @@ import (
 	"encoding/json"
 	"io"
 	"log"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"strings"
-
-	"io/ioutil"
 	"mime/multipart"
+	"net/http"
+	"net/http/cookiejar"
 	"net/textproto"
+	"net/url"
+	"regexp"
+	"strings"
 )
 
 type Client struct {
-	handler http.Handler
-	cookies map[string]string
+	codebase string
+	client   *http.Client
 }
 
 type KV struct {
@@ -25,29 +24,67 @@ type KV struct {
 	Value string
 }
 
-func New(handler http.Handler) *Client {
-	return &Client{
-		handler: handler,
-		cookies: map[string]string{},
+func New(handler http.Handler, configs ...func(*Client)) *Client {
+	cookieJar, _ := cookiejar.New(nil)
+	httpClient := &http.Client{
+		Jar: cookieJar,
+	}
+
+	if handler != nil {
+		httpClient.Transport = &roundTripper{handler: handler}
+	}
+
+	client := &Client{
+		codebase: "http://localhost",
+		client:   httpClient,
+	}
+
+	for _, config := range configs {
+		config(client)
+	}
+
+	// strip trailing slashes from codebase
+	pat := regexp.MustCompile(`/+$`)
+	client.codebase = pat.ReplaceAllString(client.codebase, "")
+
+	return client
+}
+
+func Codebase(codebase string) func(c *Client) {
+	return func(c *Client) {
+		c.codebase = codebase
 	}
 }
 
 func (c *Client) Cookie(name string) (string, bool) {
-	v, ok := c.cookies[name]
-	return v, ok
+	u, err := url.Parse(c.codebase)
+	if err != nil {
+		return "", false
+	}
+
+	if cookies := c.client.Jar.Cookies(u); cookies != nil {
+		for _, cookie := range cookies {
+			if cookie.Name == name {
+				return cookie.Value, true
+			}
+		}
+	}
+
+	return "", false
 }
 
 func (c *Client) DO(method, path string, header http.Header, body interface{}, keyvals ...KV) (*http.Response, error) {
-	if c.cookies == nil {
-		c.cookies = map[string]string{}
-	}
-
 	values := url.Values{}
 	for _, kv := range keyvals {
 		values.Add(kv.Key, kv.Value)
 	}
 
-	urlStr := "http://localhost" + path
+	var urlStr string
+	if strings.HasPrefix(path, "http") {
+		urlStr = path
+	} else {
+		urlStr = c.codebase + path
+	}
 	if len(values) > 0 {
 		urlStr = urlStr + "?" + values.Encode()
 	}
@@ -81,40 +118,7 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 		}
 	}
 
-	cookies := ""
-	for k, v := range c.cookies {
-		cookies = cookies + "; " + k + "=" + v
-	}
-	if len(cookies) > 0 {
-		cookies = cookies[2:]
-	}
-	req.Header.Set("Cookie", cookies)
-
-	w := httptest.NewRecorder()
-
-	// ---------------------------------------------
-	// execute the handler
-	//
-	c.handler.ServeHTTP(w, req)
-
-	// ---------------------------------------------
-	// handle cookies in the response
-	//
-
-	// capture cookies
-	if setCookie := w.Header().Get("Set-Cookie"); setCookie != "" {
-		parts := strings.Split(setCookie, "=")
-		name := parts[0]
-		value := strings.Split(parts[1], ";")[0]
-		c.cookies[name] = value
-	}
-
-	return &http.Response{
-		StatusCode: w.Code,
-		Request:    req,
-		Header:     w.HeaderMap,
-		Body:       ioutil.NopCloser(bytes.NewReader(w.Body.Bytes())),
-	}, nil
+	return c.client.Do(req)
 }
 
 func (c *Client) GET(path string, keyvals ...KV) (*http.Response, error) {
