@@ -185,7 +185,7 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 
 	if c.w != nil {
 		buf := bytes.NewBuffer([]byte{})
-		fmt.Fprintf(buf, "#-- Request ------------------------------------------\n")
+		fmt.Fprintf(buf, "\n#-- Request ------------------------------------------\n")
 		fmt.Fprintf(buf, "%v %v\n", method, urlStr)
 		for key, values := range req.Header {
 			for _, value := range values {
@@ -214,7 +214,7 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 		}
 		resp.Body = ioutil.NopCloser(bytes.NewReader(data))
 
-		fmt.Fprintf(buf, "#-- Response -----------------------------------------\n")
+		fmt.Fprintf(buf, "\n\n#-- Response -----------------------------------------\n")
 		fmt.Fprintf(buf, "%v %v\n", resp.StatusCode, resp.Status)
 		for key, values := range resp.Header {
 			for _, value := range values {
