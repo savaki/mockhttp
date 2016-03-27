@@ -1,9 +1,12 @@
 package mockhttp
 
 import (
+	"bytes"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 )
@@ -21,6 +24,30 @@ func MockCookie(cookieName string) http.HandlerFunc {
 		}
 
 		io.WriteString(w, cookie.Value)
+	}
+}
+
+func TestClientOutput(t *testing.T) {
+	buf := bytes.NewBuffer([]byte{})
+	client := New(MockCookie("blah"), Output(buf), BasicAuth("foo", "bar"))
+	client.POST("/", map[string]string{"hello": "world"})
+
+	rx := regexp.MustCompile(`\s+`)
+	content := rx.ReplaceAllString(string(buf.Bytes()), "")
+
+	// -- test request -------------------------------------------------
+
+	request := rx.ReplaceAllString(`
+POST http://localhost/
+Authorization: Basic Zm9vOmJhcg==
+
+{
+  "hello": "world"
+}
+`, "")
+
+	if !strings.Contains(content, request) {
+		t.Errorf("expected substring %v; got %v", request, content)
 	}
 }
 

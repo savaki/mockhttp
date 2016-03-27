@@ -3,7 +3,9 @@ package mockhttp
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/http/cookiejar"
@@ -17,6 +19,7 @@ type Client struct {
 	codebase string
 	client   *http.Client
 	authFunc func(*http.Request) error
+	w        io.Writer
 }
 
 type KV struct {
@@ -53,12 +56,14 @@ func New(handler http.Handler, configs ...func(*Client)) *Client {
 	return client
 }
 
+// Codebase allows one to specify a remote codebase (defaults to http://localhost)
 func Codebase(codebase string) func(c *Client) {
 	return func(c *Client) {
 		c.codebase = codebase
 	}
 }
 
+// BasicAuth provides basic auth
 func BasicAuth(username, password string) func(c *Client) {
 	return func(c *Client) {
 		c.authFunc = func(req *http.Request) error {
@@ -68,9 +73,17 @@ func BasicAuth(username, password string) func(c *Client) {
 	}
 }
 
+// AuthFunc allows for an arbitrary authentication function
 func AuthFunc(authFunc func(*http.Request) error) func(c *Client) {
 	return func(c *Client) {
 		c.authFunc = authFunc
+	}
+}
+
+// Output enables debug output to be written to the specified writer
+func Output(w io.Writer) func(c *Client) {
+	return func(c *Client) {
+		c.w = w
 	}
 }
 
@@ -91,6 +104,44 @@ func (c *Client) Cookie(name string) (string, bool) {
 	return "", false
 }
 
+func newReader(body interface{}) io.Reader {
+	if body == nil {
+		return nil
+	}
+
+	var r io.Reader
+	switch v := body.(type) {
+	case []byte:
+		r = bytes.NewReader(v)
+	case io.Reader:
+		r = v
+	default:
+		data, _ := json.Marshal(body)
+		r = bytes.NewReader(data)
+	}
+
+	return r
+}
+
+func prettyReader(body interface{}) io.Reader {
+	if body == nil {
+		return nil
+	}
+
+	var r io.Reader
+	switch body.(type) {
+	case []byte:
+		r = strings.NewReader("[binary content]")
+	case io.Reader:
+		r = strings.NewReader("[binary content]")
+	default:
+		data, _ := json.MarshalIndent(body, "", "  ")
+		r = bytes.NewReader(data)
+	}
+
+	return r
+}
+
 func (c *Client) DO(method, path string, header http.Header, body interface{}, keyvals ...KV) (*http.Response, error) {
 	values := url.Values{}
 	for _, kv := range keyvals {
@@ -107,18 +158,7 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 		urlStr = urlStr + "?" + values.Encode()
 	}
 
-	var r io.Reader
-	if body != nil {
-		switch v := body.(type) {
-		case []byte:
-			r = bytes.NewReader(v)
-		case io.Reader:
-			r = v
-		default:
-			data, _ := json.Marshal(body)
-			r = bytes.NewReader(data)
-		}
-	}
+	r := newReader(body)
 
 	// ---------------------------------------------
 	// create the request
@@ -143,7 +183,49 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 		}
 	}
 
-	return c.client.Do(req)
+	if c.w != nil {
+		buf := bytes.NewBuffer([]byte{})
+		fmt.Fprintf(buf, "#-- Request ------------------------------------------\n")
+		fmt.Fprintf(buf, "%v %v\n", method, urlStr)
+		for key, values := range req.Header {
+			for _, value := range values {
+				fmt.Fprintf(buf, "%v: %v\n", key, value)
+			}
+		}
+		if body != nil {
+			io.WriteString(buf, "\n")
+			io.Copy(buf, prettyReader(body))
+		}
+
+		io.Copy(c.w, buf)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.w != nil {
+		buf := bytes.NewBuffer([]byte{})
+		defer resp.Body.Close()
+		data, err := ioutil.ReadAll(r)
+		if err != nil {
+			return nil, err
+		}
+		resp.Body = ioutil.NopCloser(bytes.NewReader(data))
+
+		fmt.Fprintf(buf, "#-- Response -----------------------------------------\n")
+		fmt.Fprintf(buf, "%v %v\n", resp.StatusCode, resp.Status)
+		for key, values := range resp.Header {
+			for _, value := range values {
+				fmt.Fprintf(buf, "%v: %v\n", key, value)
+			}
+		}
+		buf.Write(data)
+		io.Copy(c.w, buf)
+	}
+
+	return resp, nil
 }
 
 func (c *Client) GET(path string, keyvals ...KV) (*http.Response, error) {
