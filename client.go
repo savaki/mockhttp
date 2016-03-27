@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"log"
 	"mime/multipart"
 	"net/http"
 	"net/http/cookiejar"
@@ -17,6 +16,7 @@ import (
 type Client struct {
 	codebase string
 	client   *http.Client
+	authFunc func(*http.Request) error
 }
 
 type KV struct {
@@ -56,6 +56,21 @@ func New(handler http.Handler, configs ...func(*Client)) *Client {
 func Codebase(codebase string) func(c *Client) {
 	return func(c *Client) {
 		c.codebase = codebase
+	}
+}
+
+func BasicAuth(username, password string) func(c *Client) {
+	return func(c *Client) {
+		c.authFunc = func(req *http.Request) error {
+			req.SetBasicAuth(username, password)
+			return nil
+		}
+	}
+}
+
+func AuthFunc(authFunc func(*http.Request) error) func(c *Client) {
+	return func(c *Client) {
+		c.authFunc = authFunc
 	}
 }
 
@@ -110,7 +125,7 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 	//
 	req, err := http.NewRequest(method, urlStr, r)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 
 	if header != nil {
@@ -118,6 +133,13 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 			for _, value := range values {
 				req.Header.Add(key, value)
 			}
+		}
+	}
+
+	// handle authentication
+	if c.authFunc != nil {
+		if err = c.authFunc(req); err != nil {
+			return nil, err
 		}
 	}
 
