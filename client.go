@@ -215,13 +215,14 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 		resp.Body = ioutil.NopCloser(bytes.NewReader(data))
 
 		fmt.Fprintf(buf, "\n\n#-- Response -----------------------------------------\n")
-		fmt.Fprintf(buf, "%v %v\n", resp.StatusCode, resp.Status)
+		fmt.Fprintf(buf, "%v\n", resp.Status)
 		for key, values := range resp.Header {
 			for _, value := range values {
 				fmt.Fprintf(buf, "%v: %v\n", key, value)
 			}
 		}
 		buf.Write(data)
+		fmt.Fprintf(buf, "\n\n#-- End ----------------------------------------------\n")
 		io.Copy(c.w, buf)
 	}
 
