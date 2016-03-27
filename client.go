@@ -208,7 +208,7 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 	if c.w != nil {
 		buf := bytes.NewBuffer([]byte{})
 		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(r)
+		data, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err
 		}

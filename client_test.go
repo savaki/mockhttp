@@ -2,6 +2,7 @@ package mockhttp
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -27,10 +28,24 @@ func MockCookie(cookieName string) http.HandlerFunc {
 	}
 }
 
+func MockOutput(body interface{}) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(body)
+	}
+}
+
 func TestClientOutput(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	client := New(MockCookie("blah"), Output(buf), BasicAuth("foo", "bar"))
-	client.POST("/", map[string]string{"hello": "world"})
+	client := New(MockOutput(map[string]string{"foo": "bar"}),
+		Output(buf),
+		BasicAuth("foo", "bar"),
+	)
+	resp, err := client.POST("/", map[string]string{"hello": "world"})
+	if err != nil {
+		t.Errorf("expected no error; got %v", err)
+		return
+	}
 
 	rx := regexp.MustCompile(`\s+`)
 	content := rx.ReplaceAllString(string(buf.Bytes()), "")
@@ -48,6 +63,16 @@ Authorization: Basic Zm9vOmJhcg==
 
 	if !strings.Contains(content, request) {
 		t.Errorf("expected substring %v; got %v", request, content)
+	}
+
+	var v map[string]string
+	err = json.NewDecoder(resp.Body).Decode(&v)
+	if err != nil {
+		t.Errorf("expected no error; got %v", err)
+		return
+	}
+	if v["foo"] != "bar" {
+		t.Errorf("expected output to leave the body alone; got %v", v)
 	}
 }
 
