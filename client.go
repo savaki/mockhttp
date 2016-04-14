@@ -207,21 +207,25 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 
 	if c.w != nil {
 		buf := bytes.NewBuffer([]byte{})
-		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		resp.Body = ioutil.NopCloser(bytes.NewReader(data))
 
-		fmt.Fprintf(buf, "\n\n#-- Response -----------------------------------------\n")
-		fmt.Fprintf(buf, "%v\n", resp.Status)
-		for key, values := range resp.Header {
-			for _, value := range values {
-				fmt.Fprintf(buf, "%v: %v\n", key, value)
+		if resp.Body != nil {
+			defer resp.Body.Close()
+			data, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				return nil, err
 			}
+			resp.Body = ioutil.NopCloser(bytes.NewReader(data))
+
+			fmt.Fprintf(buf, "\n\n#-- Response -----------------------------------------\n")
+			fmt.Fprintf(buf, "%v\n", resp.Status)
+			for key, values := range resp.Header {
+				for _, value := range values {
+					fmt.Fprintf(buf, "%v: %v\n", key, value)
+				}
+			}
+			buf.Write(data)
 		}
-		buf.Write(data)
+
 		fmt.Fprintf(buf, "\n\n#-- End ----------------------------------------------\n")
 		io.Copy(c.w, buf)
 	}
