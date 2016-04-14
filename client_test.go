@@ -108,3 +108,34 @@ func TestClientIsCookieAware(t *testing.T) {
 		t.Errorf("expected %v; got %v", cookieValue, v)
 	}
 }
+
+func TestTransportGET(t *testing.T) {
+	expected := "hello world"
+	var fn http.HandlerFunc = func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Location", "/")
+		w.WriteHeader(http.StatusTemporaryRedirect)
+		io.WriteString(w, expected)
+	}
+	client := New(fn)
+	resp, err := client.TransportGET("/")
+	if err != nil {
+		t.Errorf("expected nil err; got %v", err)
+		return
+	}
+
+	if resp.StatusCode != http.StatusTemporaryRedirect {
+		t.Errorf("expected %v; got %v", http.StatusTemporaryRedirect, resp.StatusCode)
+		return
+	}
+
+	data, _ := ioutil.ReadAll(resp.Body)
+	if v := string(data); v != expected {
+		t.Errorf("expected %v; got %v", expected, v)
+		return
+	}
+
+	if v := resp.Header.Get("Location"); v != "/" {
+		t.Errorf("expected %v; got %v", "/", v)
+		return
+	}
+}

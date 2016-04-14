@@ -142,14 +142,14 @@ func prettyReader(body interface{}) io.Reader {
 	return r
 }
 
-func (c *Client) DO(method, path string, header http.Header, body interface{}, keyvals ...KV) (*http.Response, error) {
+func (c *Client) urlStr(path string, keyvals ...KV) string {
 	values := url.Values{}
 	for _, kv := range keyvals {
 		values.Add(kv.Key, kv.Value)
 	}
 
 	var urlStr string
-	if strings.HasPrefix(path, "http") {
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
 		urlStr = path
 	} else {
 		urlStr = c.codebase + path
@@ -158,6 +158,20 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 		urlStr = urlStr + "?" + values.Encode()
 	}
 
+	return urlStr
+}
+
+func (c *Client) TransportGET(path string, keyvals ...KV) (*http.Response, error) {
+	urlStr := c.urlStr(path, keyvals...)
+	req, err := http.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.client.Transport.RoundTrip(req)
+}
+
+func (c *Client) DO(method, path string, header http.Header, body interface{}, keyvals ...KV) (*http.Response, error) {
+	urlStr := c.urlStr(path, keyvals...)
 	r := newReader(body)
 
 	// ---------------------------------------------
