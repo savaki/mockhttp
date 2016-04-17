@@ -167,7 +167,12 @@ func (c *Client) TransportGET(path string, keyvals ...KV) (*http.Response, error
 	if err != nil {
 		return nil, err
 	}
-	return c.client.Transport.RoundTrip(req)
+
+	roundTripper := c.client.Transport
+	if roundTripper == nil {
+		roundTripper = http.DefaultTransport
+	}
+	return roundTripper.RoundTrip(req)
 }
 
 func (c *Client) DO(method, path string, header http.Header, body interface{}, keyvals ...KV) (*http.Response, error) {
