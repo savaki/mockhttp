@@ -13,11 +13,13 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type Client struct {
 	codebase string
 	client   *http.Client
+	notifier Notifier
 	authFunc func(*http.Request) error
 	w        io.Writer
 }
@@ -27,7 +29,9 @@ type KV struct {
 	Value string
 }
 
-func New(handler http.Handler, configs ...func(*Client)) *Client {
+type Option func(*Client)
+
+func New(handler http.Handler, options ...Option) *Client {
 	cookieJar, _ := cookiejar.New(nil)
 	httpClient := &http.Client{
 		Jar: cookieJar,
@@ -38,11 +42,13 @@ func New(handler http.Handler, configs ...func(*Client)) *Client {
 	}
 
 	client := &Client{
-		client: httpClient,
+		client:   httpClient,
+		notifier: nopNotifier{},
+		authFunc: func(*http.Request) error { return nil },
 	}
 
-	for _, config := range configs {
-		config(client)
+	for _, opt := range options {
+		opt(client)
 	}
 
 	if client.codebase == "" {
@@ -57,14 +63,14 @@ func New(handler http.Handler, configs ...func(*Client)) *Client {
 }
 
 // Codebase allows one to specify a remote codebase (defaults to http://localhost)
-func Codebase(codebase string) func(c *Client) {
+func Codebase(codebase string) Option {
 	return func(c *Client) {
 		c.codebase = codebase
 	}
 }
 
 // BasicAuth provides basic auth
-func BasicAuth(username, password string) func(c *Client) {
+func BasicAuth(username, password string) Option {
 	return func(c *Client) {
 		c.authFunc = func(req *http.Request) error {
 			req.SetBasicAuth(username, password)
@@ -74,16 +80,22 @@ func BasicAuth(username, password string) func(c *Client) {
 }
 
 // AuthFunc allows for an arbitrary authentication function
-func AuthFunc(authFunc func(*http.Request) error) func(c *Client) {
+func AuthFunc(authFunc func(*http.Request) error) Option {
 	return func(c *Client) {
 		c.authFunc = authFunc
 	}
 }
 
 // Output enables debug output to be written to the specified writer
-func Output(w io.Writer) func(c *Client) {
+func Output(w io.Writer) Option {
 	return func(c *Client) {
 		c.w = w
+	}
+}
+
+func Observer(n Notifier) Option {
+	return func(c *Client) {
+		c.notifier = n
 	}
 }
 
@@ -196,10 +208,8 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 	}
 
 	// handle authentication
-	if c.authFunc != nil {
-		if err = c.authFunc(req); err != nil {
-			return nil, err
-		}
+	if err = c.authFunc(req); err != nil {
+		return nil, err
 	}
 
 	if c.w != nil {
@@ -219,7 +229,11 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 		io.Copy(c.w, buf)
 	}
 
+	since := time.Now()
 	resp, err := c.client.Do(req)
+	if resp != nil {
+		c.notifier.Notify(resp.StatusCode, req.Method, req.URL.Path, time.Now().Sub(since))
+	}
 	if err != nil {
 		return nil, err
 	}
