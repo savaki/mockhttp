@@ -82,7 +82,11 @@ func BasicAuth(username, password string) Option {
 // AuthFunc allows for an arbitrary authentication function
 func AuthFunc(authFunc func(*http.Request) error) Option {
 	return func(c *Client) {
-		c.authFunc = authFunc
+		if authFunc == nil {
+			c.authFunc = func(*http.Request) error { return nil }
+		} else {
+			c.authFunc = authFunc
+		}
 	}
 }
 
