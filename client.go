@@ -43,7 +43,7 @@ func New(handler http.Handler, options ...Option) *Client {
 
 	client := &Client{
 		client:   httpClient,
-		notifier: nopNotifier{},
+		notifier: NopNotifier{},
 		authFunc: func(*http.Request) error { return nil },
 	}
 

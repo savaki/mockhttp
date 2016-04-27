@@ -12,8 +12,8 @@ type Notifier interface {
 	Notify(code int, method, endpoint string, elapsed time.Duration)
 }
 
-type nopNotifier struct {
+type NopNotifier struct {
 }
 
-func (n nopNotifier) Notify(code int, method, endpoint string, elapsed time.Duration) {
+func (n NopNotifier) Notify(code int, method, endpoint string, elapsed time.Duration) {
 }
