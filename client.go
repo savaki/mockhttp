@@ -184,6 +184,11 @@ func (c *Client) TransportGET(path string, keyvals ...KV) (*http.Response, error
 		return nil, err
 	}
 
+	// handle authentication
+	if err = c.authFunc(req); err != nil {
+		return nil, err
+	}
+
 	roundTripper := c.client.Transport
 	if roundTripper == nil {
 		roundTripper = http.DefaultTransport
