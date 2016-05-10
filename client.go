@@ -295,15 +295,25 @@ func (c *Client) DELETE(path string, keyvals ...KV) (*http.Response, error) {
 	return c.DO("DELETE", path, nil, nil, keyvals...)
 }
 
-func (c *Client) Upload(path string, r io.Reader) (*http.Response, error) {
+func (c *Client) Upload(path string, r io.Reader, keyvals ...KV) (*http.Response, error) {
 	buf := bytes.NewBuffer([]byte{})
 
 	m := multipart.NewWriter(buf)
+
 	h := textproto.MIMEHeader{}
 	h.Set("Content-Disposition", `form-data; name="image"; filename="sample.png"`)
 	h.Set("Content-Type", "image/png")
 	w, _ := m.CreatePart(h)
 	io.Copy(w, r)
+
+	for _, kv := range keyvals {
+		header := textproto.MIMEHeader{}
+		header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%v"`, kv.Key))
+		header.Set("Content-Type", "text/plain")
+		w, _ := m.CreatePart(header)
+		io.WriteString(w, kv.Value)
+	}
+
 	m.Close()
 
 	header := http.Header{}
