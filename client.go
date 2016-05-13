@@ -14,6 +14,9 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"golang.org/x/net/context"
+	"golang.org/x/net/context/ctxhttp"
 )
 
 type Client struct {
@@ -238,8 +241,9 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 		io.Copy(c.w, buf)
 	}
 
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
 	since := time.Now()
-	resp, err := c.client.Do(req)
+	resp, err := ctxhttp.Do(ctx, c.client, req)
 	if resp != nil {
 		defer resp.Body.Close()
 		c.notifier.Notify(resp.StatusCode, req.Method, req.URL.Path, time.Now().Sub(since))
