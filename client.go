@@ -241,6 +241,7 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 	since := time.Now()
 	resp, err := c.client.Do(req)
 	if resp != nil {
+		defer resp.Body.Close()
 		c.notifier.Notify(resp.StatusCode, req.Method, req.URL.Path, time.Now().Sub(since))
 	}
 	if err != nil {
@@ -251,7 +252,6 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 		buf := bytes.NewBuffer([]byte{})
 
 		if resp.Body != nil {
-			defer resp.Body.Close()
 			data, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
 				return nil, err
