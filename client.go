@@ -2,6 +2,7 @@ package mockhttp
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,9 +15,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"golang.org/x/net/context"
-	"golang.org/x/net/context/ctxhttp"
 )
 
 type Client struct {
@@ -226,7 +224,7 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 
 	if c.w != nil {
 		buf := bytes.NewBuffer([]byte{})
-		fmt.Fprintf(buf, "\n#-- Request ------------------------------------------\n")
+		fmt.Fprintln(buf, "\n#-- Request ------------------------------------------")
 		fmt.Fprintf(buf, "%v %v\n", method, urlStr)
 		for key, values := range req.Header {
 			for _, value := range values {
@@ -242,8 +240,9 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 	}
 
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
+	req = req.WithContext(ctx)
 	since := time.Now()
-	resp, err := ctxhttp.Do(ctx, c.client, req)
+	resp, err := c.client.Do(req)
 	if resp != nil {
 		defer resp.Body.Close()
 		c.notifier.Notify(resp.StatusCode, req.Method, req.URL.Path, time.Now().Sub(since))
@@ -262,7 +261,7 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 			}
 			resp.Body = ioutil.NopCloser(bytes.NewReader(data))
 
-			fmt.Fprintf(buf, "\n\n#-- Response -----------------------------------------\n")
+			fmt.Fprintln(buf, "\n\n#-- Response -----------------------------------------")
 			fmt.Fprintf(buf, "%v\n", resp.Status)
 			for key, values := range resp.Header {
 				for _, value := range values {
@@ -272,7 +271,7 @@ func (c *Client) DO(method, path string, header http.Header, body interface{}, k
 			buf.Write(data)
 		}
 
-		fmt.Fprintf(buf, "\n\n#-- End ----------------------------------------------\n")
+		fmt.Fprintln(buf, "\n\n#-- End ----------------------------------------------")
 		io.Copy(c.w, buf)
 	}
 
